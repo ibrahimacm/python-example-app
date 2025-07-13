@@ -1,0 +1,42 @@
+trigger:
+- none
+
+pool: 'pool'
+
+stages:
+- stage: CI_build_image
+  displayName: Build and publish stage
+  jobs:
+  - job: Build
+    displayName: Build job
+    steps:
+    - task: Docker@2
+      displayName: Build and publish image to Azure Container Registry
+      inputs:
+        command: buildAndPush
+        containerRegistry: dockerRegistry
+        repository: apps/python-example-ap
+        dockerfile: dockerfile
+        tags: |
+          'tag'
+
+- stage: CD_dev_env
+  displayName: Deploy stage on dev
+  dependsOn:
+  - CI_build_image
+  jobs:
+  - deployment: deploy_backup
+    displayName: Deploy to dev Environment
+    environment: 'dev'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: Kubernetes@1
+            displayName: Deploy to Kubernetes cluster
+            inputs:
+              connectionType: 'Kubernetes Service Connection'
+              kubernetesServiceEndpoint: dev
+              namespace: test-example-app
+              command: set
+              arguments: image deployment/python-example-app python-example-app=registry:tag
